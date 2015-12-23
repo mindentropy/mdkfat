@@ -1,0 +1,18 @@
+TODO:
+----
+
+1) Based on PetitFS use the following low level interfaces for
+access to the underlying storage.
+
+	(a) disk_initialize -- Initialize Storage device.
+	(b) disk_readp -- Read a partial sector
+	(c) disk_writep -- Write a partial sector.
+
+2) Implement the following application interfaces:
+	(a) fs_mount --> Done.
+	(b) fs_open
+	(c) fs_read
+	(d) fs_write
+	(e) fs_lseek
+	(f) fs_opendir
+	(g) fs_readdir
