@@ -21,7 +21,7 @@ then
 fi
 
 echo "---------------------"
-echo "Creating an image file \"$OUTIMGFILE\" of size $SIZE"
+echo "Creating an image file \"$IMG_FILE\" of size $SIZE"
 dd if=/dev/zero of=$IMG_FILE bs=$BS count=$COUNT
 
 echo "---------------------"
@@ -40,6 +40,13 @@ mkdir $TMP_MOUNT_DIR
 echo "Attempting to mount the image to $TMP_MOUNT_DIR"
 mount -tvfat $IMG_FILE $TMP_MOUNT_DIR
 
+for((i=1;i<10;i++));
+do 
+	echo "val$i">>"$TMP_MOUNT_DIR/$TEST_FILENAME$i$TEST_FILE_EXT"
+done 
+
 
 echo "Attempting to unmount $TMP_MOUNT_DIR"
 umount $TMP_MOUNT_DIR
+
+rmdir -v $TMP_MOUNT_DIR
