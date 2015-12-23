@@ -1,0 +1,7 @@
+This project involves development of a FAT32 filesystem for small microcontrollers.
+This will be originally developed for the MDK OS to read FAT32 filesytem.
+
+Development of this project will be done outside of any tree and debugging will be
+done using the standard libraries. To integrate this project into an existing 
+microcontroller project appropriate changes has to be done for the microcontroller/microprocessor
+environment.
