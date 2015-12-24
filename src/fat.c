@@ -114,6 +114,32 @@ static uint8_t checkfs(char *buff,
 	return VALID_FAT_FMT;
 }
 
+void read_fs_info(struct fatfs *fatfs, struct fatfs_info *fatfs_info)
+{
+	char buff[8];
+
+	disk_io_read(buff,fatfs->bpb_fs_info,FSI_LEAD_SIG_OFF,4);
+	fatfs_info->fsi_lead_sig = DWORD(buff);
+	printf("Lead Sig : 0x%x\n",fatfs_info->fsi_lead_sig);
+
+
+	disk_io_read(buff,fatfs->bpb_fs_info,FSI_STRUCSIG_OFF,4);
+	fatfs_info->fsi_struc_sig = DWORD(buff);
+	printf("Struc Sig : 0x%x\n",fatfs_info->fsi_struc_sig);
+
+	disk_io_read(buff,fatfs->bpb_fs_info,FSI_FREE_COUNT_OFF,4);
+	fatfs_info->fsi_free_count = DWORD(buff);
+	printf("Free clusters : %u\n",fatfs_info->fsi_free_count);
+	
+	disk_io_read(buff,fatfs->bpb_fs_info,FSI_NXT_FREE_OFF,4);
+	fatfs_info->fsi_nxt_free = DWORD(buff);
+	printf("Next free cluster : %u\n",fatfs_info->fsi_nxt_free);
+
+	disk_io_read(buff,fatfs->bpb_fs_info,FSI_TRAILSIG_OFF,4);
+	fatfs_info->fsi_trail_sig = DWORD(buff);
+	printf("Trail sig : 0x%x\n",fatfs_info->fsi_trail_sig);
+}
+
 int fat_mount(struct fatfs *fatfs)
 {
 	int result = 0;
@@ -204,6 +230,19 @@ int fat_mount(struct fatfs *fatfs)
 
 	fatfs->bpb_root_cluster = DWORD(buff);
 	printf("Root cluster : %d\n",fatfs->bpb_root_cluster); 
+
+
+	printf("bkup sector offset : %u\n",BPB_BK_BOOT_SECT);
+	disk_io_read(buff,0,
+				BPB_BK_BOOT_SECT,
+				2);
+	fatfs->bpb_bk_boot_sect = WORD(buff);
+	printf("Backup boot sector at : %d\n",fatfs->bpb_bk_boot_sect);
+
+	disk_io_read(buff,0,BPB_FS_INFO,2);
+	fatfs->bpb_fs_info = WORD(buff);
+	printf("FS Info sector : %u\n",fatfs->bpb_fs_info);
+
 	return result;
 }
 
@@ -216,12 +255,15 @@ int fat_open(
 	int result = 0;
 
 	unsigned long fat_begin_lba = 0;
+	struct fatfs_info fatfs_info;
 
 	fatfs->fat_begin_lba = fatfs->bpb_resvd_sector_cnt;
 	fatfs->cluster_begin_lba = fatfs->bpb_resvd_sector_cnt + 
 		(fatfs->bpb_num_of_fats * fatfs->bpb_sectors_per_fat);
 
 	printf("FAT cluster begin : %u sectors\n",fatfs->cluster_begin_lba);
+
+	read_fs_info(fatfs,&fatfs_info);
 
 	return result;
 }

@@ -10,7 +10,7 @@ FAT_BIN = $(BIN_DIR)/fat_test
 CC = gcc
 LD = ld
 
-all: fat_test
+all: cscope_create fat_test
 
 SRC_FILES := $(foreach dir,$(SRC_DIR),$(wildcard $(dir)/*.c))
 OBJ_FILES := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRC_FILES))

@@ -48,20 +48,38 @@
 #define BS_VOL_LABEL				(BS_VOL_ID  + 4)
 #define BS_FSTYPE					(BS_VOL_LABEL  + 11)
 
+#define FSI_LEAD_SIG_OFF 			0
+#define FSI_RESERVED1_OFF 			(FSI_LEAD_SIG_OFF + 4)
+#define FSI_STRUCSIG_OFF			(FSI_RESERVED1_OFF + 480)
+#define FSI_FREE_COUNT_OFF 			(FSI_STRUCSIG_OFF + 4)
+#define FSI_NXT_FREE_OFF 			(FSI_FREE_COUNT_OFF + 4)
+#define FSI_RESERVED2_OFF 			(FSI_NXT_FREE_OFF + 4)
+#define FSI_TRAILSIG_OFF 			(FSI_RESERVED2_OFF + 12)
+
 struct fatfs {
 	uint8_t 	fatfs_type;
 	uint8_t  	bpb_sectors_per_cluster;
-	uint16_t 	bpb_bytes_per_sector;
-	uint32_t 	bpb_sectors_per_fat;
 	uint8_t 	bpb_num_of_fats;
-	uint32_t 	bpb_fat_start_sector;
+	uint16_t 	bpb_bytes_per_sector;
 	uint16_t 	bpb_resvd_sector_cnt;
 	uint16_t 	bpb_root_ent;
+	uint16_t 	bpb_bk_boot_sect;
+	uint16_t 	bpb_fs_info;
+	uint32_t 	bpb_fat_start_sector;
 	uint32_t 	bpb_total_sectors;
 	uint32_t 	bpb_first_data_sector;
 	uint32_t 	bpb_root_cluster;
 	uint32_t 	fat_begin_lba;
 	uint32_t 	cluster_begin_lba;
+	uint32_t 	bpb_sectors_per_fat;
+};
+
+struct fatfs_info {
+	uint32_t 	fsi_lead_sig;
+	uint32_t 	fsi_struc_sig;
+	uint32_t  	fsi_free_count;
+	uint32_t 	fsi_nxt_free;
+	uint32_t 	fsi_trail_sig;
 };
 
 /*

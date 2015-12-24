@@ -26,7 +26,7 @@ dd if=/dev/zero of=$IMG_FILE bs=$BS count=$COUNT
 
 echo "---------------------"
 echo "Creating FAT32 fs"
-mkfs.fat -n "test volume" -F 32 -v $IMG_FILE
+mkfs.fat -F32 -v $IMG_FILE
 
 
 if [ -d "$TMP_MOUNT_DIR" ]
