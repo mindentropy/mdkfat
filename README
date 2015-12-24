@@ -5,3 +5,48 @@ Development of this project will be done outside of any tree and debugging will 
 done using the standard libraries. To integrate this project into an existing 
 microcontroller project appropriate changes has to be done for the microcontroller/microprocessor
 environment.
+
+
+
+Understanding of the FAT Filesystem.
+===================================
+MBR: Master boot record.
+The Master boot record is 512 bytes. The master boot record ends with the 
+signature 0x55 0xAA.
+The 64 bytes behind the signature contains the start of the partition table
+entry. There are 4 partition table entries each of 16 bytes.
+
+The following diagram explains this:
+
+Master Boot Record:
+     ___________________
+	| 					|
+	| 					|
+	| 					|
+	| 					|
+	| Boot code of 446 	|
+	|           bytes 	|
+	| 					|
+	| 					|
+	| 					|
+	| 					|
+	| 					|
+	| 					|
+	| 					|
+	| 		   _________|
+	|_________|_________|
+	|P1_______|_________|
+	|P2_______|_________|
+	|P3_______|_________|
+	|P4		  |0x55 0xAA|
+	---------------------
+
+P1,P2,P3 and P4 contains the partition table of 16 bytes each.
+
+Observations with the partition scheme
+--------------------------------------
+
+I am seeing multiple boot signature 0x55 0xAA (at least 3) with the 
+MBR partition data entry being empty. How should I be checking the 
+partition info?
+
