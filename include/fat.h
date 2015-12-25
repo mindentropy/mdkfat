@@ -56,6 +56,53 @@
 #define FSI_RESERVED2_OFF 			(FSI_NXT_FREE_OFF + 4)
 #define FSI_TRAILSIG_OFF 			(FSI_RESERVED2_OFF + 12)
 
+
+#define DIR_NAME_OFF 				0
+#define DIR_ATTR_OFF 				(DIR_NAME_OFF + 11)
+#define DIR_NTRES_OFF 				(DIR_ATTR_OFF + 1)
+#define DIR_CRT_TIMETENTH_OFF 		(DIR_NTRES_OFF + 1)
+#define DIR_CRT_TIME_OFF 			(DIR_CRT_TIMETENTH_OFF + 1)
+#define DIR_CRT_DATE_OFF 			(DIR_CRT_TIME_OFF + 2)
+#define DIR_LST_ACC_DATE_OFF 		(DIR_CRT_DATE_OFF + 2)
+#define DIR_FST_CLUS_HI_OFF 		(DIR_LST_ACC_DATE_OFF + 2)
+#define DIR_WRT_TIME_OFF 			(DIR_FST_CLUS_HI_OFF + 2)
+#define DIR_WRT_DATE_OFF 			(DIR_WRT_TIME_OFF + 2)
+#define DIR_FST_CLUS_LO_OFF 		(DIR_WRT_DATE_OFF + 2)
+#define DIR_FILESIZE 				(DIR_FST_CLUS_LO_OFF + 2)
+
+
+#define ATTR_READ_ONLY  		0x01U
+#define ATTR_HIDDEN 			0x02U
+#define ATTR_SYSTEM 			0x04U
+#define ATTR_VOLUME_ID 			0x08U
+#define ATTR_DIRECTORY 			0x10U
+#define ATTR_ARCHIVE 			0x20U
+#define ATTR_LONG_NAME 			(ATTR_READ_ONLY| \
+								ATTR_HIDDEN| 	\
+								ATTR_SYSTEM| 	\
+								ATTR_VOLUME_ID)
+
+struct fatfs_info {
+	uint32_t 	fsi_lead_sig;
+	uint32_t 	fsi_struc_sig;
+	uint32_t  	fsi_free_count;
+	uint32_t 	fsi_nxt_free;
+	uint32_t 	fsi_trail_sig;
+};
+
+struct dir_entry {
+	char dir_name[11];
+	uint8_t dir_attr;
+	uint8_t dir_crt_time_tenth;
+	uint32_t dir_crt_time;
+	uint32_t dir_crt_date;
+	uint16_t dir_last_acc_date;
+	uint16_t dir_write_time;
+	uint16_t dir_write_date;
+	uint32_t dir_first_cluster;
+	uint32_t dir_file_size;
+};
+
 struct fatfs {
 	uint8_t 	fatfs_type;
 	uint8_t  	bpb_sectors_per_cluster;
@@ -67,19 +114,14 @@ struct fatfs {
 	uint16_t 	bpb_fs_info;
 	uint32_t 	bpb_fat_start_sector;
 	uint32_t 	bpb_total_sectors;
-	uint32_t 	bpb_first_data_sector;
+	uint32_t 	first_data_sector;
 	uint32_t 	bpb_root_cluster;
-	uint32_t 	fat_begin_lba;
-	uint32_t 	cluster_begin_lba;
 	uint32_t 	bpb_sectors_per_fat;
-};
 
-struct fatfs_info {
-	uint32_t 	fsi_lead_sig;
-	uint32_t 	fsi_struc_sig;
-	uint32_t  	fsi_free_count;
-	uint32_t 	fsi_nxt_free;
-	uint32_t 	fsi_trail_sig;
+	uint32_t 	bs_vol_id;
+	char 		bs_vol_label[11];
+
+	struct fatfs_info fatfs_info;
 };
 
 /*
@@ -122,6 +164,9 @@ int fat_write(void *buff,
 			int *bytes_written);
 
 int fat_lseek(int offset);
+
+void dump_fatfs_fsinfo(struct fatfs *fatfs);
+void dump_fatfs_info(struct fatfs *fatfs);
 
 
 // TODO: Below should be moved to a util header file 

@@ -119,25 +119,157 @@ void read_fs_info(struct fatfs *fatfs, struct fatfs_info *fatfs_info)
 	char buff[8];
 
 	disk_io_read(buff,fatfs->bpb_fs_info,FSI_LEAD_SIG_OFF,4);
-	fatfs_info->fsi_lead_sig = DWORD(buff);
-	printf("Lead Sig : 0x%x\n",fatfs_info->fsi_lead_sig);
-
+	fatfs->fatfs_info.fsi_lead_sig = DWORD(buff);
 
 	disk_io_read(buff,fatfs->bpb_fs_info,FSI_STRUCSIG_OFF,4);
-	fatfs_info->fsi_struc_sig = DWORD(buff);
-	printf("Struc Sig : 0x%x\n",fatfs_info->fsi_struc_sig);
+	fatfs->fatfs_info.fsi_struc_sig = DWORD(buff);
 
 	disk_io_read(buff,fatfs->bpb_fs_info,FSI_FREE_COUNT_OFF,4);
-	fatfs_info->fsi_free_count = DWORD(buff);
-	printf("Free clusters : %u\n",fatfs_info->fsi_free_count);
+	fatfs->fatfs_info.fsi_free_count = DWORD(buff);
 	
 	disk_io_read(buff,fatfs->bpb_fs_info,FSI_NXT_FREE_OFF,4);
-	fatfs_info->fsi_nxt_free = DWORD(buff);
-	printf("Next free cluster : %u\n",fatfs_info->fsi_nxt_free);
+	fatfs->fatfs_info.fsi_nxt_free = DWORD(buff);
 
 	disk_io_read(buff,fatfs->bpb_fs_info,FSI_TRAILSIG_OFF,4);
-	fatfs_info->fsi_trail_sig = DWORD(buff);
-	printf("Trail sig : 0x%x\n",fatfs_info->fsi_trail_sig);
+	fatfs->fatfs_info.fsi_trail_sig = DWORD(buff);
+}
+
+void dump_fatfs_fsinfo(struct fatfs *fatfs)
+{
+	printf("Lead Sig : 0x%x\n",fatfs->fatfs_info.fsi_lead_sig);
+	printf("Struc Sig : 0x%x\n",fatfs->fatfs_info.fsi_struc_sig);
+	printf("Free clusters : %u\n",fatfs->fatfs_info.fsi_free_count);
+	printf("Next free cluster : %u\n",fatfs->fatfs_info.fsi_nxt_free);
+	printf("Trail sig : 0x%x\n",fatfs->fatfs_info.fsi_trail_sig);
+}
+
+
+void dump_dir(struct dir_entry *dir_entry) {
+	int i = 0;
+
+	printf("0x%x ",dir_entry->dir_attr);
+
+	for(i = 0; i<11; i++) {
+		printf("%c",dir_entry->dir_name[i]);
+	}
+	printf(" ");
+
+
+	printf("%u:%u:%u ", ((dir_entry->dir_crt_time_tenth)&0xF800)>>11,
+						((dir_entry->dir_crt_time_tenth)&0x7E0)>>5,
+						((dir_entry->dir_crt_time_tenth)&0x1F)
+						);
+
+	printf("%u:%u:%u ",
+						((dir_entry->dir_crt_time)&0xF800)>>11,
+						((dir_entry->dir_crt_time)&0x7E0)>>5,
+						((dir_entry->dir_crt_time)&0x1F)
+						);
+
+	printf("%u/%u/%u ",
+						(((dir_entry->dir_crt_date)>>9)&0x7F),
+						((dir_entry->dir_crt_date)&0x1E0)>>5,
+						((dir_entry->dir_crt_date)&0x1F)
+						);
+
+	printf("%u/%u/%u ",
+						(((dir_entry->dir_last_acc_date)>>9)&0x7F),
+						((dir_entry->dir_last_acc_date)&0x1E0)>>5,
+						((dir_entry->dir_last_acc_date)&0x1F)
+						);
+
+	printf("%u:%u:%u ",
+						((dir_entry->dir_write_time)&0xF800)>>11,
+						((dir_entry->dir_write_time)&0x7E0)>>5,
+						((dir_entry->dir_write_time)&0x1F)
+						);
+
+	printf("%u/%u/%u ",
+						(((dir_entry->dir_write_date)>>9)&0x7F),
+						((dir_entry->dir_write_date)&0x1E0)>>5,
+						((dir_entry->dir_write_date)&0x1F)
+						);
+
+	printf("%u ",dir_entry->dir_first_cluster);
+	printf("%u ",dir_entry->dir_file_size);
+
+	printf("\n");
+
+}
+
+void read_dir(struct fatfs *fatfs)
+{
+	struct dir_entry dir_entry;
+	char buff[32];
+	uint8_t i = 0;
+	uint32_t j = 0;
+
+	while(1) {
+
+		disk_io_read(buff,
+					fatfs->first_data_sector,
+					j,
+					32);
+		
+		for(i = 0;i<11;i++) {
+			dir_entry.dir_name[i] = buff[i];
+		}
+	
+		dir_entry.dir_attr = buff[DIR_ATTR_OFF];
+		dir_entry.dir_crt_time_tenth = buff[DIR_CRT_TIMETENTH_OFF];
+	
+		dir_entry.dir_crt_time = buff[DIR_CRT_TIME_OFF]  
+										|(buff[DIR_CRT_TIME_OFF + 1] << 8);
+	
+		dir_entry.dir_crt_date = buff[DIR_CRT_DATE_OFF] | 
+										(buff[DIR_CRT_DATE_OFF + 1] << 8);
+	
+		dir_entry.dir_last_acc_date = buff[DIR_LST_ACC_DATE_OFF]  
+										|(buff[DIR_LST_ACC_DATE_OFF + 1] << 8);
+		dir_entry.dir_write_time = buff[DIR_WRT_TIME_OFF] 
+										|(buff[DIR_WRT_TIME_OFF + 1] << 8);
+	
+		dir_entry.dir_write_date = buff[DIR_WRT_DATE_OFF] |
+										(buff[DIR_WRT_DATE_OFF + 1] << 8);
+	
+		dir_entry.dir_first_cluster = buff[DIR_FST_CLUS_LO_OFF]  
+										|(buff[DIR_FST_CLUS_LO_OFF+1] << 8)
+										|(buff[DIR_FST_CLUS_HI_OFF] << 16)
+										|(buff[DIR_FST_CLUS_HI_OFF+1] << 24);
+	
+		dir_entry.dir_file_size = buff[DIR_FILESIZE]
+									|(buff[DIR_FILESIZE+1] << 8)
+									|(buff[DIR_FILESIZE+2] << 16)
+									|(buff[DIR_FILESIZE+3] << 24);
+		dump_dir(&dir_entry);
+		j += 32;
+		getchar();
+	}
+}
+
+void dump_fatfs_info(struct fatfs *fatfs)
+{
+	int i  = 0;
+	printf("Sectors per cluster : %u\n",
+					fatfs->bpb_sectors_per_cluster);
+
+	printf("Bytes per sector :%u\n",
+				fatfs->bpb_bytes_per_sector
+				);
+	printf("Sectors per fat: %u\n",fatfs->bpb_sectors_per_fat);
+	printf("Num of fats: %d\n",fatfs->bpb_num_of_fats);
+	printf("No.of reserved sectors : %u\n",fatfs->bpb_resvd_sector_cnt);
+	printf("Root cluster : %d\n",fatfs->bpb_root_cluster); 
+	printf("Backup boot sector at : %d\n",fatfs->bpb_bk_boot_sect);
+	printf("FS Info sector : %u\n",fatfs->bpb_fs_info);
+	printf("Volume id : %x\n",fatfs->bs_vol_id);
+	printf("Start sector : %u\n",fatfs->first_data_sector);
+
+	printf("Volume label : ");
+	for(i = 0; i<11; i++) {
+		printf("%c",fatfs->bs_vol_label[i]);
+	}
+	printf("\n");
 }
 
 int fat_mount(struct fatfs *fatfs)
@@ -146,6 +278,7 @@ int fat_mount(struct fatfs *fatfs)
 	char buff[36];
 	uint8_t fatfs_type = 0;
 	uint32_t fsize = 0;
+	int i = 0;
 
 	if((result = disk_io_init()) == -1) {
 		return result;
@@ -164,16 +297,11 @@ int fat_mount(struct fatfs *fatfs)
 					1);
 	fatfs->bpb_sectors_per_cluster = BYTE(buff);
 
-	printf("Sectors per cluster : %u\n",
-					fatfs->bpb_sectors_per_cluster);
 
 	disk_io_read(buff,0,
 					BPB_BYTES_PER_SEC_OFF,
 					2);
 	fatfs->bpb_bytes_per_sector = WORD(buff);
-	printf("Bytes per sector :%u\n",
-				fatfs->bpb_bytes_per_sector
-				);
 
 	
 	disk_io_read(buff,
@@ -181,17 +309,12 @@ int fat_mount(struct fatfs *fatfs)
 					BPB_FATSZ32,
 					4);
 	fatfs->bpb_sectors_per_fat = DWORD(buff);
-	
-
-	printf("Sectors per fat: %u\n",fatfs->bpb_sectors_per_fat);
 
 	disk_io_read(buff,
 					0,
 					BPB_NUM_FATS,
 					1);
 	fatfs->bpb_num_of_fats = BYTE(buff);
-	
-	printf("Num of fats: %d\n",fatfs->bpb_num_of_fats);
 
 	fsize = (fatfs->bpb_sectors_per_fat) * (fatfs->bpb_num_of_fats);
 
@@ -203,7 +326,6 @@ int fat_mount(struct fatfs *fatfs)
 
 	fatfs->bpb_fat_start_sector = fatfs->bpb_resvd_sector_cnt;
 					
-	printf("No.of reserved sectors : %u\n",fatfs->bpb_resvd_sector_cnt);
 
 	disk_io_read(buff,
 					0,
@@ -215,12 +337,10 @@ int fat_mount(struct fatfs *fatfs)
 					0,
 					BPB_TOTSEC32,
 					4);
-
 	fatfs->bpb_total_sectors = DWORD(buff);
 
-	printf("Total sectors : %u\n",fatfs->bpb_total_sectors);
 
-	fatfs->bpb_first_data_sector = fatfs->bpb_resvd_sector_cnt + 
+	fatfs->first_data_sector = fatfs->bpb_resvd_sector_cnt + 
 			(fatfs->bpb_num_of_fats * fatfs->bpb_sectors_per_fat);
 			
 
@@ -229,19 +349,23 @@ int fat_mount(struct fatfs *fatfs)
 			4);
 
 	fatfs->bpb_root_cluster = DWORD(buff);
-	printf("Root cluster : %d\n",fatfs->bpb_root_cluster); 
 
-
-	printf("bkup sector offset : %u\n",BPB_BK_BOOT_SECT);
 	disk_io_read(buff,0,
 				BPB_BK_BOOT_SECT,
 				2);
 	fatfs->bpb_bk_boot_sect = WORD(buff);
-	printf("Backup boot sector at : %d\n",fatfs->bpb_bk_boot_sect);
 
 	disk_io_read(buff,0,BPB_FS_INFO,2);
 	fatfs->bpb_fs_info = WORD(buff);
-	printf("FS Info sector : %u\n",fatfs->bpb_fs_info);
+
+
+	disk_io_read(buff,0,BS_VOL_ID,4);
+	fatfs->bs_vol_id = DWORD(buff);
+
+	disk_io_read(buff,0,BS_VOL_LABEL,11);
+	for(i = 0;i<11;i++) {
+		fatfs->bs_vol_label[i] = buff[i];
+	}
 
 	return result;
 }
@@ -254,17 +378,11 @@ int fat_open(
 {
 	int result = 0;
 
-	unsigned long fat_begin_lba = 0;
 	struct fatfs_info fatfs_info;
-
-	fatfs->fat_begin_lba = fatfs->bpb_resvd_sector_cnt;
-	fatfs->cluster_begin_lba = fatfs->bpb_resvd_sector_cnt + 
-		(fatfs->bpb_num_of_fats * fatfs->bpb_sectors_per_fat);
-
-	printf("FAT cluster begin : %u sectors\n",fatfs->cluster_begin_lba);
 
 	read_fs_info(fatfs,&fatfs_info);
 
+	read_dir(fatfs);
 	return result;
 }
 

@@ -5,6 +5,7 @@ TMP_MOUNT_DIR=tmp_mnt
 
 TEST_FILENAME="test"
 TEST_FILE_EXT=".txt"
+VOLUME_LABEL="TestVolume"
 
 let BS=1024
 let COUNT=2048
@@ -26,7 +27,7 @@ dd if=/dev/zero of=$IMG_FILE bs=$BS count=$COUNT
 
 echo "---------------------"
 echo "Creating FAT32 fs"
-mkfs.fat -F32 -v $IMG_FILE
+mkfs.fat -n $VOLUME_LABEL -F32 -v $IMG_FILE
 
 
 if [ -d "$TMP_MOUNT_DIR" ]

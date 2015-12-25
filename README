@@ -19,7 +19,7 @@ entry. There are 4 partition table entries each of 16 bytes.
 The following diagram explains this:
 
 Master Boot Record:
-     ___________________
+    +-------------------+ 
     |                   |
     |                   |
     |                   |
@@ -39,7 +39,7 @@ Master Boot Record:
     |P2_______|_________|
     |P3_______|_________|
     |P4       |0x55 0xAA|
-    ---------------------
+    +-------------------+
 
 P1,P2,P3 and P4 contains the partition table of 16 bytes each.
 
@@ -47,6 +47,18 @@ Observations with the partition scheme
 --------------------------------------
 
 I am seeing multiple boot signature 0x55 0xAA (at least 3) with the 
-MBR partition data entry being empty. How should I be checking the 
-partition info?
+MBR partition data entry being empty. Why?
+
+If you take a peek at the create_testfs_image shell script you will find that 
+I am creating a image without any partitions. The image is just one big filesystem.
+Hence there are no partition data present.
+
+In the case of multiple boot signatures please see Microsoft FAT32 specifications Pg22.
+In it you will find that the Microsoft FAT32 "boot sector" is actually three 512-byte sectors
+long. Also there is a copy of all these sectors starting at the BPB_BkBootSec sector. The 
+BPB_BkBootSec is the backup boot sector. This is a feature of the FAT32 filesystem. The
+idea behind this is if sector 0 is overwritten or corrupted by some means the whole filesystem
+cannot be read making it a single point of failure. To prevent this a backup copy of the 
+boot sector information is kept at BPB_BkBootSec which is usually 6 and some of the systems are
+"hardwired" to read sector 6.
 
