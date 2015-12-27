@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "diskio.h"
 
+#define EPOCH_YEAR  1980
 
 #define FS_UNKNOWN 	0U
 #define FS_FAT12 	1U
@@ -82,6 +83,17 @@
 								ATTR_SYSTEM| 	\
 								ATTR_VOLUME_ID)
 
+
+#define LDIR_ORD_OFF			0
+#define LDIR_NAME1_OFF 			(LDIR_ORD_OFF + 1)
+#define LDIR_ATTR_OFF 			(LDIR_NAME1_OFF + 10)
+#define LDIR_TYPE_OFF 			(LDIR_ATTR_OFF + 1)
+#define LDIR_CHKSUM_OFF			(LDIR_TYPE_OFF + 1)
+#define LDIR_NAME2_OFF 			(LDIR_CHKSUM_OFF + 1)
+#define LDIR_FST_CLUS_LO_OFF 	(LDIR_NAME2_OFF + 12)
+#define LDIR_NAME3_OFF 			(LDIR_FST_CLUS_LO_OFF + 2)
+
+
 struct fatfs_info {
 	uint32_t 	fsi_lead_sig;
 	uint32_t 	fsi_struc_sig;
@@ -101,6 +113,17 @@ struct dir_entry {
 	uint16_t dir_write_date;
 	uint32_t dir_first_cluster;
 	uint32_t dir_file_size;
+};
+
+struct long_dir_entry {
+	uint8_t 	ldir_ord;
+	uint8_t 	ldir_name1[10];
+	uint8_t 	ldir_attr;
+	uint8_t 	ldir_type;
+	uint8_t 	ldir_chksum;
+	uint8_t 	ldir_name2[12];
+	uint16_t 	ldir_fst_clus_lo;
+	uint8_t  	ldir_name3[4];
 };
 
 struct fatfs {

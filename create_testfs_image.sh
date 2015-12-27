@@ -19,11 +19,13 @@ if [ -e "$IMG_FILE" ]
 then
 	echo "$IMG_FILE file present. Removing to create a new image"
 	rm -v "$IMG_FILE"
+	sync
 fi
 
 echo "---------------------"
 echo "Creating an image file \"$IMG_FILE\" of size $SIZE"
 dd if=/dev/zero of=$IMG_FILE bs=$BS count=$COUNT
+sync
 
 echo "---------------------"
 echo "Creating FAT32 fs"
@@ -41,9 +43,13 @@ mkdir $TMP_MOUNT_DIR
 echo "Attempting to mount the image to $TMP_MOUNT_DIR"
 mount -tvfat $IMG_FILE $TMP_MOUNT_DIR
 
+
+echo "Populating the directory with files:"
 for((i=1;i<10;i++));
 do 
+	echo "$TEST_FILENAME$i$TEST_FILE_EXT"
 	echo "val$i">>"$TMP_MOUNT_DIR/$TEST_FILENAME$i$TEST_FILE_EXT"
+	sync
 done 
 
 

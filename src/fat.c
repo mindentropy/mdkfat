@@ -144,7 +144,8 @@ void dump_fatfs_fsinfo(struct fatfs *fatfs)
 }
 
 
-void dump_dir(struct dir_entry *dir_entry) {
+void dump_dir(struct dir_entry *dir_entry) 
+{
 	int i = 0;
 
 	printf("0x%x ",dir_entry->dir_attr);
@@ -160,6 +161,7 @@ void dump_dir(struct dir_entry *dir_entry) {
 						((dir_entry->dir_crt_time_tenth)&0x1F)
 						);
 
+
 	printf("%u:%u:%u ",
 						((dir_entry->dir_crt_time)&0xF800)>>11,
 						((dir_entry->dir_crt_time)&0x7E0)>>5,
@@ -167,13 +169,13 @@ void dump_dir(struct dir_entry *dir_entry) {
 						);
 
 	printf("%u/%u/%u ",
-						(((dir_entry->dir_crt_date)>>9)&0x7F),
+						(((dir_entry->dir_crt_date)>>9)&0x7F)+EPOCH_YEAR,
 						((dir_entry->dir_crt_date)&0x1E0)>>5,
 						((dir_entry->dir_crt_date)&0x1F)
 						);
 
 	printf("%u/%u/%u ",
-						(((dir_entry->dir_last_acc_date)>>9)&0x7F),
+						(((dir_entry->dir_last_acc_date)>>9)&0x7F)+EPOCH_YEAR,
 						((dir_entry->dir_last_acc_date)&0x1E0)>>5,
 						((dir_entry->dir_last_acc_date)&0x1F)
 						);
@@ -185,7 +187,7 @@ void dump_dir(struct dir_entry *dir_entry) {
 						);
 
 	printf("%u/%u/%u ",
-						(((dir_entry->dir_write_date)>>9)&0x7F),
+						(((dir_entry->dir_write_date)>>9)&0x7F)+EPOCH_YEAR,
 						((dir_entry->dir_write_date)&0x1E0)>>5,
 						((dir_entry->dir_write_date)&0x1F)
 						);
@@ -197,10 +199,94 @@ void dump_dir(struct dir_entry *dir_entry) {
 
 }
 
+void dump_long_dir_entry(struct long_dir_entry *long_dir_entry)
+{
+	uint8_t i = 0;
+	printf("0x%x ",long_dir_entry->ldir_ord);
+
+	printf("%u ",long_dir_entry->ldir_type);
+	printf("%u ",long_dir_entry->ldir_chksum);
+	printf("%u ",long_dir_entry->ldir_fst_clus_lo);
+
+	for(i = 0; i<10; i++) 
+		printf("%c",long_dir_entry->ldir_name1[i]);
+
+	for(i = 0; i<12; i++)
+		printf("%c",long_dir_entry->ldir_name2[i]);
+	
+	for(i = 0; i<4; i++)
+		printf("%c",long_dir_entry->ldir_name3[i]);
+	
+}
+
+
+void parse_dir_entry(uint8_t *buff, struct dir_entry *dir_entry)
+{
+	int i = 0;
+	dir_entry->dir_attr = buff[DIR_ATTR_OFF];
+
+	for(i = 0;i<11;i++) {
+		dir_entry->dir_name[i] = buff[i];
+	}
+
+	dir_entry->dir_crt_time_tenth = buff[DIR_CRT_TIMETENTH_OFF];
+	dir_entry->dir_crt_time = WORD(buff + DIR_CRT_TIME_OFF);
+	dir_entry->dir_crt_date = WORD(buff + DIR_CRT_DATE_OFF);
+	dir_entry->dir_last_acc_date = WORD(buff + DIR_LST_ACC_DATE_OFF);
+	dir_entry->dir_write_time = WORD(buff + DIR_WRT_TIME_OFF);
+	dir_entry->dir_write_date = WORD(buff + DIR_WRT_DATE_OFF);
+	
+	dir_entry->dir_first_cluster = WORD(buff + DIR_FST_CLUS_LO_OFF)
+									| (WORD(buff + DIR_FST_CLUS_HI_OFF) << 16);
+								
+
+	/*dir_entry.dir_first_cluster = buff[DIR_FST_CLUS_LO_OFF]  
+									|(buff[DIR_FST_CLUS_LO_OFF+1] << 8)
+									|(buff[DIR_FST_CLUS_HI_OFF] << 16)
+									|(buff[DIR_FST_CLUS_HI_OFF+1] << 24);*/
+
+	dir_entry->dir_file_size = DWORD(buff + DIR_FILESIZE);
+							
+							
+
+	/*dir_entry.dir_file_size = buff[DIR_FILESIZE]
+								|(buff[DIR_FILESIZE+1] << 8)
+								|(buff[DIR_FILESIZE+2] << 16)
+								|(buff[DIR_FILESIZE+3] << 24);*/
+}
+
+void parse_ldir_entry(
+					uint8_t *buff,
+					struct long_dir_entry *long_dir_entry
+					)
+{
+	int i = 0;
+
+	long_dir_entry->ldir_attr = buff[LDIR_ATTR_OFF];
+	long_dir_entry->ldir_ord = buff[LDIR_ORD_OFF];
+	
+	for(i = 0; i<10; i++) 
+		long_dir_entry->ldir_name1[i] = buff[LDIR_NAME1_OFF + i];
+
+	long_dir_entry->ldir_type = buff[LDIR_TYPE_OFF];
+	long_dir_entry->ldir_chksum = buff[LDIR_CHKSUM_OFF];
+
+	for(i = 0; i<10; i++)
+		long_dir_entry->ldir_name2[i] = buff[LDIR_NAME2_OFF + i];
+
+	long_dir_entry->ldir_fst_clus_lo = WORD(buff+LDIR_FST_CLUS_LO_OFF);
+
+	for(i = 0; i<10; i++)
+		long_dir_entry->ldir_name3[i] = buff[LDIR_NAME3_OFF + i];
+
+}
+
 void read_dir(struct fatfs *fatfs)
 {
 	struct dir_entry dir_entry;
-	char buff[32];
+	struct long_dir_entry long_dir_entry;
+
+	uint8_t buff[32];
 	uint8_t i = 0;
 	uint32_t j = 0;
 
@@ -210,40 +296,17 @@ void read_dir(struct fatfs *fatfs)
 					fatfs->first_data_sector,
 					j,
 					32);
-		
-		for(i = 0;i<11;i++) {
-			dir_entry.dir_name[i] = buff[i];
+		if(buff[0] ==  0x00)
+			break;
+
+		if(buff[DIR_ATTR_OFF] != ATTR_LONG_NAME) {
+			parse_dir_entry(buff, &dir_entry);
+			dump_dir(&dir_entry);
+		} else if(buff[LDIR_ATTR_OFF] == ATTR_LONG_NAME) {
+			//parse_ldir_entry(buff, &long_dir_entry);
+			//dump_long_dir_entry(&long_dir_entry);
 		}
-	
-		dir_entry.dir_attr = buff[DIR_ATTR_OFF];
-		dir_entry.dir_crt_time_tenth = buff[DIR_CRT_TIMETENTH_OFF];
-	
-		dir_entry.dir_crt_time = buff[DIR_CRT_TIME_OFF]  
-										|(buff[DIR_CRT_TIME_OFF + 1] << 8);
-	
-		dir_entry.dir_crt_date = buff[DIR_CRT_DATE_OFF] | 
-										(buff[DIR_CRT_DATE_OFF + 1] << 8);
-	
-		dir_entry.dir_last_acc_date = buff[DIR_LST_ACC_DATE_OFF]  
-										|(buff[DIR_LST_ACC_DATE_OFF + 1] << 8);
-		dir_entry.dir_write_time = buff[DIR_WRT_TIME_OFF] 
-										|(buff[DIR_WRT_TIME_OFF + 1] << 8);
-	
-		dir_entry.dir_write_date = buff[DIR_WRT_DATE_OFF] |
-										(buff[DIR_WRT_DATE_OFF + 1] << 8);
-	
-		dir_entry.dir_first_cluster = buff[DIR_FST_CLUS_LO_OFF]  
-										|(buff[DIR_FST_CLUS_LO_OFF+1] << 8)
-										|(buff[DIR_FST_CLUS_HI_OFF] << 16)
-										|(buff[DIR_FST_CLUS_HI_OFF+1] << 24);
-	
-		dir_entry.dir_file_size = buff[DIR_FILESIZE]
-									|(buff[DIR_FILESIZE+1] << 8)
-									|(buff[DIR_FILESIZE+2] << 16)
-									|(buff[DIR_FILESIZE+3] << 24);
-		dump_dir(&dir_entry);
 		j += 32;
-		getchar();
 	}
 }
 
@@ -381,6 +444,8 @@ int fat_open(
 	struct fatfs_info fatfs_info;
 
 	read_fs_info(fatfs,&fatfs_info);
+
+	printf(" ldir_name3 off :%u\n",LDIR_NAME3_OFF);
 
 	read_dir(fatfs);
 	return result;
