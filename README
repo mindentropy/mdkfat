@@ -62,3 +62,20 @@ cannot be read making it a single point of failure. To prevent this a backup cop
 boot sector information is kept at BPB_BkBootSec which is usually 6 and some of the systems are
 "hardwired" to read sector 6.
 
+
+Calculations:
+============
+1) Getting to the root directory sector:
+   ------------------------------------
+RootDirSector = BPB_RsvdSecCnt + (BPB_NumFATS *  BPB_FATSz32)
+To get to the root directory sector we need to get past the "Reserved Sector Count"
+in sectors plus the "Number of FATS" multiplied by the "Size per FAT" in sectors.
+
+2) Getting to the FAT structure:
+   ----------------------------
+FAT_Structure = BPD_RsvdSecCnt;
+
+FATType == FAT32 then FATOffset = N * 4;
+ThisFATSecNum = BPB_RsvdSecCnt + (FATOffset/BP_BytsPerSec);
+ThisFATEntOffset = REM(FATOffset / BPB_BytsPerSec);
+

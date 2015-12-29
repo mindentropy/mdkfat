@@ -130,6 +130,7 @@ struct fatfs {
 	uint8_t 	fatfs_type;
 	uint8_t  	bpb_sectors_per_cluster;
 	uint8_t 	bpb_num_of_fats;
+	uint8_t 	bpb_media_type;
 	uint16_t 	bpb_bytes_per_sector;
 	uint16_t 	bpb_resvd_sector_cnt;
 	uint16_t 	bpb_root_ent;
@@ -140,6 +141,7 @@ struct fatfs {
 	uint32_t 	first_data_sector;
 	uint32_t 	bpb_root_cluster;
 	uint32_t 	bpb_sectors_per_fat;
+	
 
 	uint32_t 	bs_vol_id;
 	char 		bs_vol_label[11];
