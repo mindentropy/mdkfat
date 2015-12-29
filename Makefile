@@ -7,7 +7,7 @@ LDFLAGS = -L.
 
 FAT_BIN = $(BIN_DIR)/fat_test
 
-CC = gcc
+CC = gcc -Wall
 LD = ld
 
 all: cscope_create fat_test

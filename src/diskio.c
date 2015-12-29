@@ -27,7 +27,7 @@ int disk_io_init(void)
 
 
 int disk_io_read(
-				char *buff,
+				uint8_t *buff,
 				uint32_t sector, 
 				uint32_t offset,
 				uint32_t count
@@ -52,5 +52,5 @@ int disk_io_write(
 				uint32_t count
 				)
 {
-	
+	return 0;
 }

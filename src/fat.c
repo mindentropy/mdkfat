@@ -1,6 +1,6 @@
 #include "fat.h"
 
-
+/*
 static void dump_buff(const char *buff,int length)
 {
 	int i = 0;
@@ -12,8 +12,9 @@ static void dump_buff(const char *buff,int length)
 		printf("0x%02x ",(uint32_t)(buff[i] & 0xFF));
 	}
 }
+*/
 
-static uint8_t checkfs(char *buff,
+static uint8_t checkfs(uint8_t *buff,
 						uint32_t sector,
 						uint8_t *fatfstype)
 {
@@ -116,7 +117,7 @@ static uint8_t checkfs(char *buff,
 
 void read_fs_info(struct fatfs *fatfs, struct fatfs_info *fatfs_info)
 {
-	char buff[8];
+	uint8_t buff[8];
 
 	disk_io_read(buff,fatfs->bpb_fs_info,FSI_LEAD_SIG_OFF,4);
 	fatfs->fatfs_info.fsi_lead_sig = DWORD(buff);
@@ -282,35 +283,39 @@ void parse_ldir_entry(
 }
 
 uint32_t get_fat_entry(struct fatfs *fatfs,
-						uint8_t *fat_buff,
 						uint32_t cluster_val)
 {
+	uint8_t fat_buff[512];
 	uint32_t fat_sec_num = fatfs->bpb_resvd_sector_cnt + 
 				((cluster_val << 2)/fatfs->bpb_bytes_per_sector);
 	uint32_t fat_offset = (cluster_val<<2) % fatfs->bpb_bytes_per_sector;
 
 	disk_io_read(fat_buff,fat_sec_num,0,512);
+
 	
-	return (*(((uint32_t *) fat_buff) + fat_offset)) & 0x0FFFFFFF;
+	return ((*((uint32_t *)(&fat_buff[fat_offset]))) & 0x0FFFFFFF);
 }
+
+
 
 void read_dir(struct fatfs *fatfs)
 {
 	struct dir_entry dir_entry;
-	struct long_dir_entry long_dir_entry;
 
 	uint8_t buff[32];
 
-	uint8_t i = 0;
 	uint32_t j = 0;
 
-	while(j < 512) {
+	uint32_t sector = fatfs->first_data_sector;
+	uint32_t cluster = fatfs->bpb_root_cluster;
+
+	while(j < fatfs->bpb_bytes_per_sector) {
 
 		disk_io_read(buff,
-					fatfs->first_data_sector,
+					sector,
 					j,
 					32);
-		if(buff[0] ==  0x00)
+		if(buff[0] ==  0x00) //Empty entry. Quit!
 			break;
 
 		if(buff[DIR_ATTR_OFF] != ATTR_LONG_NAME) {
@@ -321,6 +326,19 @@ void read_dir(struct fatfs *fatfs)
 			//dump_long_dir_entry(&long_dir_entry);
 		}
 		j += 32;
+
+		if(j >= fatfs->bpb_bytes_per_sector) {
+			// Search in FAT if there is a continuation of the
+			// directory entry.
+			j = 0;
+
+			cluster = get_fat_entry(fatfs,cluster);
+
+			if(cluster == fatfs->EOC)  //End of cluster then Quit!
+				break;
+			
+			sector = fatfs->first_data_sector + ((cluster-2) * fatfs->bpb_sectors_per_cluster);
+		}
 	}
 
 }
@@ -353,9 +371,8 @@ void dump_fatfs_info(struct fatfs *fatfs)
 int fat_mount(struct fatfs *fatfs)
 {
 	int result = 0;
-	char buff[36];
-	uint8_t fatfs_type = 0;
-	uint32_t fsize = 0;
+	uint8_t buff[36];
+	//uint32_t fsize = 0;
 	int i = 0;
 
 	if((result = disk_io_init()) == -1) {
@@ -394,7 +411,7 @@ int fat_mount(struct fatfs *fatfs)
 					1);
 	fatfs->bpb_num_of_fats = BYTE(buff);
 
-	fsize = (fatfs->bpb_sectors_per_fat) * (fatfs->bpb_num_of_fats);
+	//fsize = (fatfs->bpb_sectors_per_fat) * (fatfs->bpb_num_of_fats);
 
 	disk_io_read(buff,
 					0,
@@ -454,11 +471,10 @@ int fat_mount(struct fatfs *fatfs)
 
 void read_fat(struct fatfs *fatfs)
 {
-	uint32_t cluster_val = 0;
-	uint8_t fat_buff[512];
-	printf("bpb media : %x\n",fatfs->bpb_media_type);
-	printf("FAT entry at cluster val %u : %x\n",cluster_val,
-					get_fat_entry(fatfs,fat_buff,cluster_val));
+	uint32_t cluster_val = 2;
+	
+	printf("FAT entry at cluster val %u : 0x%x\n",cluster_val,
+					get_fat_entry(fatfs,cluster_val));
 }
 
 int fat_open(

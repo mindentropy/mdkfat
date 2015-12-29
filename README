@@ -66,16 +66,46 @@ boot sector information is kept at BPB_BkBootSec which is usually 6 and some of 
 Calculations:
 ============
 1) Getting to the root directory sector:
-   ------------------------------------
+---------------------------------------
 RootDirSector = BPB_RsvdSecCnt + (BPB_NumFATS *  BPB_FATSz32)
 To get to the root directory sector we need to get past the "Reserved Sector Count"
 in sectors plus the "Number of FATS" multiplied by the "Size per FAT" in sectors.
 
 2) Getting to the FAT structure:
-   ----------------------------
+-------------------------------
 FAT_Structure = BPD_RsvdSecCnt;
 
-FATType == FAT32 then FATOffset = N * 4;
+3) Finding the contents of the FAT given a cluster number N.
+------------------------------------------------------------
+
+FATType == FAT32 then FATOffset = N * 4; where N is the cluster number.
+
+Next go to the particular sector. What does this mean? The FAT table spans
+multiple sectors. You need to go the particular sector as below:
 ThisFATSecNum = BPB_RsvdSecCnt + (FATOffset/BP_BytsPerSec);
-ThisFATEntOffset = REM(FATOffset / BPB_BytsPerSec);
+
+Next in that sector go the particular offset:
+ThisFATEntOffset = (FATOffset % BPB_BytsPerSec);
+
+The FAT is arranged as clusters i.e.
+
+C1 C2 C3 C4 ..... Cn
+
+So if the first sector is kept in an array then the Sector[0] is C1 Sector[1] is C2
+Sector[n] is Cn.
+
+Here n is the FatEntOffset as shown above.
+
+4) Getting to the First cluster of the file:
+-------------------------------------------
+We first get to the First Data Sector 'FirstDataSector'
+
+FirstDataSector = BPB_ResvdSecCnt + (BPB_NumFATS * FATSz) + RootDirSectors;
+
+Here FATSz will be the Size of FAT.
+
+The FirstDataSector will take me to the RootDirectoryEntry.
+Next we find have to travel to the First Sector of the file.
+
+FirstSectorofCluster = ((N-2) * BPB_SecPerClus) + FirstDataSector
 

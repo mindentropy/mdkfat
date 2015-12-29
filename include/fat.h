@@ -141,7 +141,8 @@ struct fatfs {
 	uint32_t 	first_data_sector;
 	uint32_t 	bpb_root_cluster;
 	uint32_t 	bpb_sectors_per_fat;
-	
+
+	uint32_t 	EOC;
 
 	uint32_t 	bs_vol_id;
 	char 		bs_vol_label[11];
