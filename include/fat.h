@@ -18,6 +18,8 @@
 #define INVALID_BOOT_SIGNATURE  2
 #define VALID_FAT_FMT 			1
 
+#define DIRECTORY_ENTRY_SIZE  	32
+
 
 /* BPB Offsets */
 
@@ -138,9 +140,11 @@ struct fatfs {
 	uint16_t 	bpb_fs_info;
 	uint32_t 	bpb_fat_start_sector;
 	uint32_t 	bpb_total_sectors;
-	uint32_t 	first_data_sector;
 	uint32_t 	bpb_root_cluster;
 	uint32_t 	bpb_sectors_per_fat;
+
+	uint32_t 	first_data_sector;
+	uint32_t 	bytes_per_cluster;
 
 	uint32_t 	EOC;
 
@@ -201,5 +205,15 @@ void dump_fatfs_info(struct fatfs *fatfs);
 
 #define WORD(ptr_val) (((uint16_t) *((uint16_t *)(ptr_val))) & 0xFFFFU)
 #define BYTE(ptr_val) (((uint8_t) *((uint8_t *)(ptr_val))) & 0xFFU)
+
+
+#define get_first_data_sector(resvd_cnt,num_of_FATS,FAT_size,root_dir_sectors) \
+	((resvd_cnt) + ((num_of_FATS) * (FAT_size)) + (root_dir_sectors))
+
+#define get_first_sector_of_cluster(cluster,sector_per_cluster,firstdatasector) \
+	(((cluster - 2) * (sector_per_cluster)) + (firstdatasector))
+
+#define bytes_per_cluster(bytes_per_sector,sectors_per_cluster) \
+	((bytes_per_sector) * (sectors_per_cluster))
 
 #endif

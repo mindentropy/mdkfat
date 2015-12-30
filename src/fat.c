@@ -301,46 +301,49 @@ uint32_t get_fat_entry(struct fatfs *fatfs,
 void read_dir(struct fatfs *fatfs)
 {
 	struct dir_entry dir_entry;
-
 	uint8_t buff[32];
-
 	uint32_t j = 0;
 
-	uint32_t sector = fatfs->first_data_sector;
-	uint32_t cluster = fatfs->bpb_root_cluster;
+	
+	uint32_t first_sector_of_cluster = 
+								get_first_sector_of_cluster(fatfs->bpb_root_cluster,
+								fatfs->bpb_sectors_per_cluster,
+								fatfs->first_data_sector);
 
-	while(j < fatfs->bpb_bytes_per_sector) {
+	uint32_t current_cluster = fatfs->bpb_root_cluster;
+
+	while(1) {
 
 		disk_io_read(buff,
-					sector,
+					first_sector_of_cluster,
 					j,
-					32);
+					DIRECTORY_ENTRY_SIZE);
+
 		if(buff[0] ==  0x00) //Empty entry. Quit!
 			break;
 
 		if(buff[DIR_ATTR_OFF] != ATTR_LONG_NAME) {
 			parse_dir_entry(buff, &dir_entry);
 			dump_dir(&dir_entry);
-		} else if(buff[LDIR_ATTR_OFF] == ATTR_LONG_NAME) {
-			//parse_ldir_entry(buff, &long_dir_entry);
-			//dump_long_dir_entry(&long_dir_entry);
-		}
-		j += 32;
+		} 
 
-		if(j >= fatfs->bpb_bytes_per_sector) {
+		j += DIRECTORY_ENTRY_SIZE;
+
+		if(j >= (fatfs->bytes_per_cluster)) {
 			// Search in FAT if there is a continuation of the
 			// directory entry.
 			j = 0;
 
-			cluster = get_fat_entry(fatfs,cluster);
+			current_cluster = get_fat_entry(fatfs,current_cluster);
 
-			if(cluster == fatfs->EOC)  //End of cluster then Quit!
+			if(current_cluster == fatfs->EOC)  //End of cluster then Quit!
 				break;
 			
-			sector = fatfs->first_data_sector + ((cluster-2) * fatfs->bpb_sectors_per_cluster);
+			first_sector_of_cluster = get_first_sector_of_cluster(current_cluster,
+								fatfs->bpb_sectors_per_cluster,
+								fatfs->first_data_sector);
 		}
 	}
-
 }
 
 void dump_fatfs_info(struct fatfs *fatfs)
@@ -368,23 +371,9 @@ void dump_fatfs_info(struct fatfs *fatfs)
 	printf("\n");
 }
 
-int fat_mount(struct fatfs *fatfs)
+void init_fs_info(struct fatfs *fatfs)
 {
-	int result = 0;
-	uint8_t buff[36];
-	//uint32_t fsize = 0;
-	int i = 0;
-
-	if((result = disk_io_init()) == -1) {
-		return result;
-	}
-
-	
-	result = checkfs(buff,0,&(fatfs->fatfs_type));
-	if(result != VALID_FAT_FMT) {
-		return -1;
-	}
-
+	uint8_t buff[20], i = 0;
 	/* Initialize fs info */
 	 disk_io_read(buff,
 					0,
@@ -465,6 +454,28 @@ int fat_mount(struct fatfs *fatfs)
 		fatfs->bs_vol_label[i] = buff[i];
 	}
 
+	fatfs->bytes_per_cluster = bytes_per_cluster(
+								fatfs->bpb_bytes_per_sector,
+								fatfs->bpb_sectors_per_cluster
+								);
+}
+
+int fat_mount(struct fatfs *fatfs)
+{
+	int result = 0;
+	uint8_t buff[36];
+	//uint32_t fsize = 0;
+
+	if((result = disk_io_init()) == -1) {
+		return result;
+	}
+	
+	result = checkfs(buff,0,&(fatfs->fatfs_type));
+	if(result != VALID_FAT_FMT) {
+		return -1;
+	}
+
+	init_fs_info(fatfs);
 
 	return result;
 }

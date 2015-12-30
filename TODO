@@ -16,3 +16,6 @@ access to the underlying storage.
 	(e) fs_lseek
 	(f) fs_opendir
 	(g) fs_readdir
+
+3) Implement listing of directories present in multiple clusters. -> Done.
+4) Implement finding a file and reading it.
