@@ -20,6 +20,9 @@
 
 #define DIRECTORY_ENTRY_SIZE  	32
 
+#define DIRECTORY_ENTRY_FREE 	0x00
+#define DIRECTORY_ENTRY_FREE1   0xE5
+
 
 /* BPB Offsets */
 
@@ -215,5 +218,10 @@ void dump_fatfs_info(struct fatfs *fatfs);
 
 #define bytes_per_cluster(bytes_per_sector,sectors_per_cluster) \
 	((bytes_per_sector) * (sectors_per_cluster))
+
+
+#define is_directory_entry_free(char_val) \
+	( ((char_val) == DIRECTORY_ENTRY_FREE) || \
+		((char_val) == DIRECTORY_ENTRY_FREE1) )
 
 #endif

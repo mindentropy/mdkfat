@@ -1,7 +1,7 @@
 #include "fat.h"
 
-/*
-static void dump_buff(const char *buff,int length)
+
+static void dump_buff(const uint8_t *buff,int length)
 {
 	int i = 0;
 
@@ -12,7 +12,7 @@ static void dump_buff(const char *buff,int length)
 		printf("0x%02x ",(uint32_t)(buff[i] & 0xFF));
 	}
 }
-*/
+
 
 static uint8_t checkfs(uint8_t *buff,
 						uint32_t sector,
@@ -240,20 +240,7 @@ void parse_dir_entry(uint8_t *buff, struct dir_entry *dir_entry)
 	dir_entry->dir_first_cluster = WORD(buff + DIR_FST_CLUS_LO_OFF)
 									| (WORD(buff + DIR_FST_CLUS_HI_OFF) << 16);
 								
-
-	/*dir_entry.dir_first_cluster = buff[DIR_FST_CLUS_LO_OFF]  
-									|(buff[DIR_FST_CLUS_LO_OFF+1] << 8)
-									|(buff[DIR_FST_CLUS_HI_OFF] << 16)
-									|(buff[DIR_FST_CLUS_HI_OFF+1] << 24);*/
-
 	dir_entry->dir_file_size = DWORD(buff + DIR_FILESIZE);
-							
-							
-
-	/*dir_entry.dir_file_size = buff[DIR_FILESIZE]
-								|(buff[DIR_FILESIZE+1] << 8)
-								|(buff[DIR_FILESIZE+2] << 16)
-								|(buff[DIR_FILESIZE+3] << 24);*/
 }
 
 void parse_ldir_entry(
@@ -296,54 +283,103 @@ uint32_t get_fat_entry(struct fatfs *fatfs,
 	return ((*((uint32_t *)(&fat_buff[fat_offset]))) & 0x0FFFFFFF);
 }
 
-
-
-void read_dir(struct fatfs *fatfs)
+uint8_t cmp_name(char *str1, char *str2)
 {
-	struct dir_entry dir_entry;
-	uint8_t buff[32];
-	uint32_t j = 0;
 
-	
-	uint32_t first_sector_of_cluster = 
-								get_first_sector_of_cluster(fatfs->bpb_root_cluster,
-								fatfs->bpb_sectors_per_cluster,
-								fatfs->first_data_sector);
+	while(*str1 != '\0') {
+		if(*str1 != *str2)
+			return 0;
+
+		str1++;
+		str2++;
+	}
+
+	return 1;
+}
+
+uint8_t read_dir(struct fatfs *fatfs, struct dir_entry *dir_entry, char *filename)
+{
+	uint8_t buff[32];
+	uint32_t dir_entry_cnt = 0;
+
+	uint32_t sector = 
+					get_first_sector_of_cluster(
+					fatfs->bpb_root_cluster,
+					fatfs->bpb_sectors_per_cluster,
+					fatfs->first_data_sector);
 
 	uint32_t current_cluster = fatfs->bpb_root_cluster;
 
 	while(1) {
 
-		disk_io_read(buff,
-					first_sector_of_cluster,
-					j,
-					DIRECTORY_ENTRY_SIZE);
+		disk_io_read(
+				buff,
+				sector,
+				dir_entry_cnt,
+				DIRECTORY_ENTRY_SIZE
+				);
 
-		if(buff[0] ==  0x00) //Empty entry. Quit!
+		if(is_directory_entry_free(buff[0])) //Empty entry. Quit!
 			break;
 
 		if(buff[DIR_ATTR_OFF] != ATTR_LONG_NAME) {
-			parse_dir_entry(buff, &dir_entry);
-			dump_dir(&dir_entry);
+			parse_dir_entry(buff, dir_entry);
+			dump_dir(dir_entry);
+
+			if(cmp_name(filename,dir_entry->dir_name)) {
+				return 1;
+			}
 		} 
 
-		j += DIRECTORY_ENTRY_SIZE;
+		dir_entry_cnt += DIRECTORY_ENTRY_SIZE;
 
-		if(j >= (fatfs->bytes_per_cluster)) {
-			// Search in FAT if there is a continuation of the
-			// directory entry.
-			j = 0;
+		//If dir_entry_cnt == sector_size
+		if(dir_entry_cnt >= (fatfs->bpb_bytes_per_sector) ) { 
+			if(dir_entry_cnt >= (fatfs->bytes_per_cluster)) {
+				//If the FAT entry reaches the end of the cluster follow the cluster
+				//chain until a EndOfCluster is found.
 
-			current_cluster = get_fat_entry(fatfs,current_cluster);
+				dir_entry_cnt = 0;
+				current_cluster = get_fat_entry(fatfs,current_cluster);
 
-			if(current_cluster == fatfs->EOC)  //End of cluster then Quit!
-				break;
-			
-			first_sector_of_cluster = get_first_sector_of_cluster(current_cluster,
+				if(current_cluster == fatfs->EOC)  //End of cluster then Quit!
+					break;
+
+				sector = get_first_sector_of_cluster(current_cluster,
 								fatfs->bpb_sectors_per_cluster,
 								fatfs->first_data_sector);
+			} else {
+				//FAT Entry spans multiple sectors but not multiple clusters.
+				sector++;
+			}
 		}
 	}
+
+	return 0;
+}
+
+uint32_t read_file(
+					struct fatfs *fatfs,
+					struct dir_entry *dir_entry,
+					uint8_t *buff,
+					uint32_t len
+					)
+{
+	uint32_t sector = get_first_sector_of_cluster(
+			dir_entry->dir_first_cluster,
+			fatfs->bpb_sectors_per_cluster,
+			fatfs->first_data_sector);
+	uint8_t ch;
+	uint32_t i = 0;
+
+	while(len--) {
+		disk_io_read(&ch,sector,i,sizeof(ch));
+		buff[i++] = ch;
+	}
+
+	dump_buff(buff,i);
+
+	return i;
 }
 
 void dump_fatfs_info(struct fatfs *fatfs)
@@ -480,13 +516,6 @@ int fat_mount(struct fatfs *fatfs)
 	return result;
 }
 
-void read_fat(struct fatfs *fatfs)
-{
-	uint32_t cluster_val = 2;
-	
-	printf("FAT entry at cluster val %u : 0x%x\n",cluster_val,
-					get_fat_entry(fatfs,cluster_val));
-}
 
 int fat_open(
 				struct fatfs *fatfs,
@@ -494,16 +523,17 @@ int fat_open(
 				)
 {
 	int result = 0;
-	
+	uint8_t buff[30];
+
 	struct fatfs_info fatfs_info;
+	struct dir_entry dir_entry;
 
 	read_fs_info(fatfs,&fatfs_info);
-
 	printf("ldir_name3 off :%u\n",LDIR_NAME3_OFF);
 
-	read_dir(fatfs);
+	read_dir(fatfs,&dir_entry,"TEST1");
 
-	read_fat(fatfs);
+	read_file(fatfs,&dir_entry,buff,dir_entry.dir_file_size);
 
 	return result;
 }
