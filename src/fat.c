@@ -1,16 +1,33 @@
 #include "fat.h"
 
+#undef HEX_OP
+
+#define CHAR_OP
 
 static void dump_buff(const uint8_t *buff,int length)
 {
 	int i = 0;
 
+	printf("Dump:\n");
 	for(i = 0; i<length; i++) {
+
+#ifdef HEX_OP
 		if((i!=0) && (i%16) == 0) {
 			printf("\n");
 		}
+#endif
+
+#ifdef HEX_OP
 		printf("0x%02x ",(uint32_t)(buff[i] & 0xFF));
+#endif
+
+#ifdef CHAR_OP
+		printf("%c",(uint8_t)(buff[i] & 0xFF));
+#endif
+
 	}
+
+	printf("\n");
 }
 
 
@@ -358,28 +375,120 @@ uint8_t read_dir(struct fatfs *fatfs, struct dir_entry *dir_entry, char *filenam
 	return 0;
 }
 
-uint32_t read_file(
+
+uint32_t get_sector_from_offset(struct fatfs *fatfs,
+								struct dir_entry *dir_entry)
+{
+	uint32_t sector,cluster_count,current_cluster;
+	uint32_t sector_offset = 0;
+	//If the offset is less than a cluster and is at the start
+	//then get the cluster from the dir_entry and move to
+	//the particular sector based on the offset.
+	if(dir_entry->file_rw_info.byte_offset < bytes_per_cluster(
+									fatfs->bpb_bytes_per_sector,
+									fatfs->bpb_sectors_per_cluster)) 
+	{
+		sector = get_first_sector_of_cluster(
+						dir_entry->dir_first_cluster,
+						fatfs->bpb_sectors_per_cluster,
+						fatfs->first_data_sector
+						);
+
+		//Based on the offset find the particular sector in the cluster.
+		/*sector_offset = ((dir_entry->file_rw_info.byte_offset) % 
+					(fatfs->bytes_per_cluster))/(fatfs->bpb_bytes_per_sector);*/
+
+		sector_offset = get_sector_offset_from_cluster(
+						dir_entry->file_rw_info.byte_offset,
+						fatfs->bytes_per_cluster,
+						fatfs->bpb_bytes_per_sector
+						);
+
+		sector += sector_offset;
+	} else {
+
+		/* Using the offset follow the cluster chain to find the particular 
+		 * cluster.  
+		 * Get how many cluster chains to follow.
+		 */
+
+		cluster_count = get_cluster_count(
+						dir_entry->file_rw_info.byte_offset,
+						fatfs->bpb_bytes_per_sector,
+						fatfs->bpb_sectors_per_cluster
+						);
+
+		current_cluster = dir_entry->dir_first_cluster;
+	
+		sector_offset = get_sector_offset_from_cluster(
+						dir_entry->file_rw_info.byte_offset,
+						fatfs->bytes_per_cluster,
+						fatfs->bpb_bytes_per_sector
+						);
+
+		while(cluster_count--) {
+			current_cluster = get_fat_entry(fatfs,current_cluster);
+		}
+
+		sector = get_first_sector_of_cluster(
+								current_cluster,
+								fatfs->bpb_sectors_per_cluster,
+								fatfs->first_data_sector
+								);
+
+		sector += sector_offset;
+	}
+
+	return sector;
+}
+
+uint32_t read_file (
 					struct fatfs *fatfs,
 					struct dir_entry *dir_entry,
 					uint8_t *buff,
 					uint32_t len
 					)
 {
+	uint8_t ch;
+	uint32_t bytecnt = 0;
+	uint32_t i = 0;
+	uint32_t curr_cluster = dir_entry->dir_first_cluster;
+
 	uint32_t sector = get_first_sector_of_cluster(
-			dir_entry->dir_first_cluster,
+			curr_cluster,
 			fatfs->bpb_sectors_per_cluster,
 			fatfs->first_data_sector);
-	uint8_t ch;
-	uint32_t i = 0;
 
-	while(len--) {
-		disk_io_read(&ch,sector,i,sizeof(ch));
-		buff[i++] = ch;
+/*
+ * Read sector boundaries.
+ */
+	while(bytecnt < len) {
+		disk_io_read(&ch,sector,i++,sizeof(ch));
+		buff[bytecnt++] = ch;
+
+		dir_entry->file_rw_info.byte_offset++;
+
+		if(((bytecnt) % fatfs->bpb_bytes_per_sector) == 0) {
+			i = 0;
+			if(((bytecnt) % fatfs->bytes_per_cluster) == 0) {
+				//Find the next cluster.
+				curr_cluster = get_fat_entry(fatfs,curr_cluster);
+				//Find the first sector in that cluster.
+				sector = get_first_sector_of_cluster
+							(
+								curr_cluster,
+								fatfs->bpb_sectors_per_cluster,
+								fatfs->first_data_sector
+							);
+			} else {
+				sector++;
+			}
+		}
 	}
 
-	dump_buff(buff,i);
+	dump_buff(buff,bytecnt);
 
-	return i;
+	return bytecnt;
 }
 
 void dump_fatfs_info(struct fatfs *fatfs)
@@ -523,7 +632,7 @@ int fat_open(
 				)
 {
 	int result = 0;
-	uint8_t buff[30];
+	uint8_t buff[2048];
 
 	struct fatfs_info fatfs_info;
 	struct dir_entry dir_entry;
@@ -531,9 +640,14 @@ int fat_open(
 	read_fs_info(fatfs,&fatfs_info);
 	printf("ldir_name3 off :%u\n",LDIR_NAME3_OFF);
 
-	read_dir(fatfs,&dir_entry,"TEST1");
+	if(read_dir(fatfs,&dir_entry,"MB") == MATCH) {
+		read_file(fatfs,&dir_entry,buff,1024);
+	}
 
-	read_file(fatfs,&dir_entry,buff,dir_entry.dir_file_size);
+	dir_entry.file_rw_info.byte_offset = 1079;
+	printf("Sector from offset : %u\n",get_sector_from_offset(fatfs,&dir_entry));
+	printf("Byte offset : %u\n",
+			(get_sector_from_offset(fatfs,&dir_entry) * 512) + get_byte_offset_of_sector(dir_entry.file_rw_info.byte_offset,fatfs->bpb_bytes_per_sector));
 
 	return result;
 }

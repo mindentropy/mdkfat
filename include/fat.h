@@ -23,6 +23,8 @@
 #define DIRECTORY_ENTRY_FREE 	0x00
 #define DIRECTORY_ENTRY_FREE1   0xE5
 
+#define MATCH 		1
+#define NO_MATCH 	0
 
 /* BPB Offsets */
 
@@ -107,6 +109,10 @@ struct fatfs_info {
 	uint32_t 	fsi_trail_sig;
 };
 
+struct file_rw_info {
+	uint32_t byte_offset;
+};
+
 struct dir_entry {
 	char dir_name[11];
 	uint8_t dir_attr;
@@ -118,7 +124,9 @@ struct dir_entry {
 	uint16_t dir_write_date;
 	uint32_t dir_first_cluster;
 	uint32_t dir_file_size;
+	struct file_rw_info file_rw_info;
 };
+
 
 struct long_dir_entry {
 	uint8_t 	ldir_ord;
@@ -157,35 +165,6 @@ struct fatfs {
 	struct fatfs_info fatfs_info;
 };
 
-/*
-struct fatfs {
-	uint16_t 	bpb_bytes_per_sector;
-	uint8_t  	bpb_sector_per_cluster;
-	uint16_t 	bpb_reserved_sec_count;
-	uint8_t  	bpb_num_of_fats;
-	uint16_t 	bpb_root_ent_cnt;
-	uint16_t 	bpb_tot_sect16;
-	uint8_t  	bpb_media;
-	uint16_t 	bpb_fatsz16;
-	uint16_t 	bpb_sector_per_track;
-	uint16_t  	bpb_num_of_heads;
-	uint32_t  	bpb_hidden_sectors;
-	uint16_t 	bpb_tot_sect32;
-
-	uint32_t 	bpb_fatsz32;
-	uint16_t 	bpb_extflags;
-	uint16_t 	bpb_fs_ver;
-	uint32_t 	bpb_root_cluster;
-	uint16_t 	bpb_fs_info;
-	uint16_t 	bpb_bk_bootsec;
-	uint8_t 	bpb_drivenum;
-	uint8_t 	bpb_bootsig;
-	uint32_t 	bpb_vol_id;
-	uint32_t 	bpb_vol_label;
-	uint32_t 	bpb_fs_type;
-
-};
-*/
 
 int fat_mount(struct fatfs *fatfs);
 int fat_open(struct fatfs *fatfs, const char *filename);
@@ -213,8 +192,8 @@ void dump_fatfs_info(struct fatfs *fatfs);
 #define get_first_data_sector(resvd_cnt,num_of_FATS,FAT_size,root_dir_sectors) \
 	((resvd_cnt) + ((num_of_FATS) * (FAT_size)) + (root_dir_sectors))
 
-#define get_first_sector_of_cluster(cluster,sector_per_cluster,firstdatasector) \
-	(((cluster - 2) * (sector_per_cluster)) + (firstdatasector))
+#define get_first_sector_of_cluster(cluster,sectors_per_cluster,firstdatasector) \
+	(((cluster - 2) * (sectors_per_cluster)) + (firstdatasector))
 
 #define bytes_per_cluster(bytes_per_sector,sectors_per_cluster) \
 	((bytes_per_sector) * (sectors_per_cluster))
@@ -223,5 +202,14 @@ void dump_fatfs_info(struct fatfs *fatfs);
 #define is_directory_entry_free(char_val) \
 	( ((char_val) == DIRECTORY_ENTRY_FREE) || \
 		((char_val) == DIRECTORY_ENTRY_FREE1) )
+
+#define get_sector_offset_from_cluster(byte_offset,bytes_per_cluster,bytes_per_sector) \
+		(((byte_offset)%(bytes_per_cluster))/(bytes_per_sector))
+
+#define get_cluster_count(byte_offset,bytes_per_sector,sectors_per_cluster) \
+	( (byte_offset) / (bytes_per_cluster(bytes_per_sector,sectors_per_cluster)) )
+
+#define get_byte_offset_of_sector(byte_offset,bytes_per_sector) \
+	((byte_offset) % (bytes_per_sector))
 
 #endif
